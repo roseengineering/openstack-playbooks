@@ -88,15 +88,15 @@ After all of this is done, ssh into the controller node to build
 images and create servers.  A few helper bash scripts will be 
 in your home directory.  
 
-Run "bash status.sh" to see the status of the cluster.
-Run "bash build.sh" to create the provider network as well as 
+Run "./status.sh" to see the status of the cluster.
+Run "./build.sh" to create the provider network as well as 
 download debian and ubuntu images and register them with the cluster.
 The script will also create a security group and upload your public key
 for the demo user
 
-Run "bash list.sh" to show your running instances.  Run "bash kill.sh"
-will kill an instance.  To create an instance run either "bash ubuntu.sh"
-or "bash debian.sh".  The script nvidia.sh will create a ubuntu
+Run "./list.sh" to show your running instances.  Run "./kill.sh"
+will kill an instance.  To create an instance run either "./ubuntu.sh"
+or "./debian.sh".  The script nvidia.sh will create a ubuntu
 based instance with an Nvidia card attached.  (The nvidia card must
 be whitelisted in /etc/nova/nova.conf on the controller. At the moment
 only the 1050Ti and 750Ti cards are whitelisted.)
