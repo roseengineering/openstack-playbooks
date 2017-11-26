@@ -6,15 +6,14 @@ Included in this repo are the ansible playbooks I use to build
 my openstack cluster.  They are constantly being changed
 and, of course, your computers will very likely have
 different components and network interfaces that mine.  
-So the playbooks provided here
-are more for guidance than anything else.
+So the playbooks provided here are more for guidance than anything else.
 
 All these playbooks were based on the instructions at openstack.org
 for installing a Newton release openstack cluster.
 
-The playbooks create two versions of an openstack cluster.  
-The first is a standalone version, with a nova/compute agent 
-on the same node as the controller.  The standalone cluster is 
+The playbooks create two versions of an openstack cluster.
+The first is a standalone version, with a nova/compute agent
+on the same node as the controller.  The standalone cluster is
 the easiest to build and to test.
 
 The second version is a non-standalone cluster.  Here the controller
@@ -90,7 +89,7 @@ After all of this is done, ssh into the controller node to build
 images and create servers.  A few helper bash scripts will be 
 in your home directory.  
 
-Run "bash status.sh" to see the status of the cluster.  
+Run "bash status.sh" to see the status of the cluster.
 Run "bash build.sh" to create the provider network as well as 
 download debian and ubuntu images and register them with the cluster.
 The script will also create a security group and upload your public key
