@@ -14,13 +14,13 @@ for installing a Newton release openstack cluster.
 The playbooks create two versions of an openstack cluster.
 The first is a standalone version, with a nova/compute agent
 on the same node as the controller.  The standalone cluster is
-the easiest to build and to test.
+the easiest to build and test.
 
 The second version is a non-standalone cluster.  Here the controller
 resides on its own node.  Any compute agents are placed on 
 other nodes.
 
-The playbooks also build a nvidia card passthrough capability
+The playbooks also build a Nvidia card passthrough capability
 into each node.   The relevant files are control\_passhthru.yml
 and agent\_passthru.yml.  The imports of these tasks can
 be commented out.
@@ -98,7 +98,7 @@ for the demo user
 Run "bash list.sh" to show your running instances.  Run "bash kill.sh"
 will kill an instance.  To create an instance run either "bash ubuntu.sh"
 or "bash debian.sh".  The script nvidia.sh will create a ubuntu
-based instance with an nvidia card attached.  (The nvidia card must
+based instance with an Nvidia card attached.  (The nvidia card must
 be whitelisted in /etc/nova/nova.conf on the controller. At the moment
 only the 1050Ti and 750Ti cards are whitelisted.)
 
