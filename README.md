@@ -43,7 +43,7 @@ The playbook will change the address to a static address if
 
 Two ethernet ports need to be provided, one management and 
 the other provider.  No ip address is needed for the provider 
-network port, since it is set to manual.  Both need access to
+network port, since it is set to manual.  Both interfaces need access to
 the internet.
 
 The playbook builds a very minimal Ubuntu server with the
