@@ -3,15 +3,15 @@ openstack-playbooks
 ===========================
 
 Included in this repo are the ansible playbooks I use to build
-my openstack cluster.  They are constantly being changed
+my Openstack cluster.  They are constantly being changed
 and, of course, your computers will very likely have
 different components and network interfaces that mine.
 So the playbooks provided here are more for guidance than anything else.
 
-All these playbooks were based on the instructions at openstack.org
-for installing a Newton release openstack cluster.
+All these playbooks were based on the instructions at Openstack.org
+for installing a Newton release Openstack cluster.
 
-The playbooks create two versions of an openstack cluster.
+The playbooks create two versions of an Openstack cluster.
 The first is a standalone version, with a nova/compute agent
 on the same node as the controller.  The standalone cluster is
 the easiest to build and test.
@@ -54,21 +54,21 @@ change the name of one of your network ports.
 Your public ssh key will also be copied over as an authorized key.
 It will then reboot the server.
 
-Next you need to build the openstack controller.  I use the following
+Next you need to build the Openstack controller.  I use the following
 playbook to build it.  The parameter "hosts" is now set to the new 
 static ip address of the server.
 
     ansible-playbook stack_control.yml -vv -e hosts=192.168.0.6 \
     -e provider_if=enp4s0 -e myip=192.168.0.6
 
-If you want to build a standalone cluster, the next command is used.
+To build a standalone cluster, the next command is used.
+If used, you can now create instances and test it.
 
     ansible-playbook stack_local.yml -vv -e hosts=192.168.0.6 \
     -e provider_if=enp4s0 -e myip=192.168.0.6
 
-Then you can create instances and test it.
 
-To add a nova/compute node to your openstack cluster, build the node
+To add a nova/compute node to your Openstack cluster, build the node
 as a base server again, passing its interface names and its static ip address.
 For example, I run:
 
