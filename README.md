@@ -61,7 +61,7 @@ static ip address of the server.
     ansible-playbook stack_control.yml -vv -e hosts=192.168.0.6 \
     -e provider_if=enp4s0 -e myip=192.168.0.6
 
-To build a standalone cluster, the next command is used.
+To build a standalone cluster, the next command is run.
 If used, you can now create instances and test it.
 
     ansible-playbook stack_local.yml -vv -e hosts=192.168.0.6 \
