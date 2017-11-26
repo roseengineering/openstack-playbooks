@@ -35,7 +35,7 @@ To start the install, I use this command:
 Here, $HOST 
 is the address of the computer for ansible to ssh into.  The user
 is assumed to be your username with the password set to passw0rd.
-The ssh address can be the DHCP address of the node.  Using
+The "hosts" address can be the DHCP address of the node.  Using
 an environmental variable for setting "hosts" is useful when 
 the address is initially set by dhcp.
 
