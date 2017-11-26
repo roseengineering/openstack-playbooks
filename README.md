@@ -32,12 +32,11 @@ To start the install, I use this command:
     -e myif=enp0s31f6 -e provider_if=enp4s0 \
     -e myip=192.168.0.6 -e gateway=192.168.0.1 -e nameserver=192.168.0.1
 
-Here, $HOST 
-is the address of the computer for ansible to ssh into.  The user
-is assumed to be your username with the password set to passw0rd.
-The "hosts" address can be the DHCP address of the node.  Using
+Here, "hosts" is the address of the computer for ansible to ssh into.  
+The user is assumed to be your username with the password set to passw0rd.
+This ssh address can be the DHCP address of the node.  Using
 an environmental variable for setting "hosts" is useful when 
-the address is initially set by dhcp.
+the computer's address is initially set by dhcp.
 
 The playbook will change the address to a static address if 
 "myip" and "myif" are set.  
