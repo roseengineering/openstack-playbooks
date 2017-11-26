@@ -4,7 +4,7 @@ openstack-playbooks
 
 Included in this repo are the ansible playbooks I use to build
 my openstack cluster.  They are constantly being changed
-and, of course, your computers will verly likely have much
+and, of course, your computers will very likely have
 different components and network interfaces that mine.  
 So the playbooks provided here
 are more for guidance than anything else.
