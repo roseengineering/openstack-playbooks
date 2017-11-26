@@ -47,7 +47,7 @@ network port, since it is set to manual.  Both interfaces need access to
 the internet.
 
 The playbook builds a very minimal Ubuntu server with the
-the appropriate network settings and the passed hostname.  
+appropriate network settings and the passed hostname.  
 
 Please be aware that adding a graphic card might
 change the name of one of your network ports.
