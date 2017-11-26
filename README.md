@@ -95,7 +95,7 @@ The script will also create a security group and upload your public key
 for the demo user
 
 Run "./list.sh" to show your running instances.  Run "./kill.sh"
-will kill an instance.  To create an instance run either "./ubuntu.sh"
+to kill an instance.  To create an instance run either "./ubuntu.sh"
 or "./debian.sh".  The script nvidia.sh will create a ubuntu
 based instance with an Nvidia card attached.  (The nvidia card must
 be whitelisted in /etc/nova/nova.conf on the controller. At the moment
