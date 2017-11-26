@@ -64,7 +64,7 @@ static ip address of the server.
 If you want to build a standalone cluster, the next command is used.
 
     ansible-playbook stack_local.yml -vv -e hosts=192.168.0.6 \
-    -e provider_if=enp4s0
+    -e provider_if=enp4s0 -e myip=192.168.0.6
 
 Then you can create instances and test it.
 
