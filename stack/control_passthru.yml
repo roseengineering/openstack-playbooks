@@ -1,0 +1,45 @@
+---
+  # note, "pci_passthrough:alias"="<name>:<count>"
+
+  - shell: |
+      source admin-openrc
+      openstack flavor create --id 52 --vcpus 1 --ram 1024  --disk 20  g1.small
+      openstack flavor create --id 53 --vcpus 2 --ram 3072  --disk 40  g1.medium
+      openstack flavor create --id 54 --vcpus 4 --ram 7168  --disk 80  g1.large
+      openstack flavor create --id 55 --vcpus 8 --ram 15360 --disk 160 g1.xlarge
+      openstack flavor create --id 64 --vcpus 4 --ram 6144  --disk 80  g2.large
+      openstack flavor create --id 65 --vcpus 8 --ram 14336 --disk 160 g2.xlarge
+      openstack flavor create --id 75 --vcpus 8 --ram 12288 --disk 160 g4.xlarge
+      # set properties: g1 is one gpu, g2 is two, g4 is four
+      openstack flavor set g1.small  --property "pci_passthrough:alias"="gpu:1"
+      openstack flavor set g1.medium --property "pci_passthrough:alias"="gpu:1"
+      openstack flavor set g1.large  --property "pci_passthrough:alias"="gpu:1"
+      openstack flavor set g1.xlarge --property "pci_passthrough:alias"="gpu:1"
+      openstack flavor set g2.large  --property "pci_passthrough:alias"="gpu:2"
+      openstack flavor set g2.xlarge --property "pci_passthrough:alias"="gpu:2"
+      openstack flavor set g4.xlarge --property "pci_passthrough:alias"="gpu:4"
+    args: 
+      executable: /bin/bash
+
+  - blockinfile:
+      dest: /etc/nova/nova.conf
+      marker: '# control_passthru_marker'
+      block: |
+        [DEFAULT]
+        pci_alias = {"vendor_id":"10de","device_type":"type-PCI","name":"gpu"}
+    become: yes
+
+  # restart the compute services:
+
+  - shell: service nova-api restart
+    become: yes
+  - shell: service nova-consoleauth restart
+    become: yes
+  - shell: service nova-scheduler restart
+    become: yes
+  - shell: service nova-conductor restart
+    become: yes
+  - shell: service nova-novncproxy restart
+    become: yes
+
+

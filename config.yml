@@ -1,0 +1,8 @@
+---
+user: "{{ lookup('env','USER') }}"
+
+# ssh
+
+id_rsa: "{{ lookup('pipe', 'cat ~/.ssh/id_rsa') }}"
+id_rsa_pub: "{{ lookup('pipe', 'ssh-keygen -f ~/.ssh/id_rsa -y') }}"
+

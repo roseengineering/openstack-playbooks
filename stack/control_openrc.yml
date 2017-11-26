@@ -1,0 +1,334 @@
+---
+
+  # write openrc files
+
+  - copy:
+      dest: ./admin-openrc
+      content: |
+        export OS_PROJECT_DOMAIN_NAME=default
+        export OS_USER_DOMAIN_NAME=default
+        export OS_PROJECT_NAME=admin
+        export OS_USERNAME=admin
+        export OS_AUTH_URL=http://{{ master_ip }}:35357/v3
+        export OS_IDENTITY_API_VERSION=3
+        export OS_IMAGE_API_VERSION=2
+        export OS_PASSWORD={{ admin_pass }}
+
+  - copy:
+      dest: ./demo-openrc
+      content: |
+        export OS_PROJECT_DOMAIN_NAME=default
+        export OS_USER_DOMAIN_NAME=default
+        export OS_PROJECT_NAME=demo
+        export OS_USERNAME=demo
+        export OS_AUTH_URL=http://{{ master_ip }}:5000/v3
+        export OS_IDENTITY_API_VERSION=3
+        export OS_IMAGE_API_VERSION=2
+        export OS_PASSWORD={{ demo_pass }}
+
+  #######################
+
+  - copy:
+      dest: ./status.sh
+      mode: 0755
+      content: |
+        #!/bin/bash
+        . admin-openrc
+        set -v
+        openstack service list
+        openstack image list
+        openstack compute service list
+        openstack flavor list
+        openstack server list
+        neutron agent-list
+        nova list
+        nova availability-zone-list
+        openstack availability zone list # ZONE
+        openstack host list              # HOST
+        openstack hypervisor list        # NODE
+
+  - copy:
+      dest: ./kill.sh
+      mode: 0755
+      content: |
+        #!/bin/bash
+        . demo-openrc
+        openstack server delete $1
+        sleep 4; openstack server list
+
+  - copy:
+      dest: ./list.sh
+      mode: 0755
+      content: |
+        #!/bin/bash
+        . demo-openrc
+        openstack server list
+
+  - copy:
+      dest: ./debian.sh
+      mode: 0755
+      content: |
+        #!/bin/bash
+        . demo-openrc
+        name=$(shuf -n1 /usr/share/dict/words | sed "s/'s//" | tr [A-Z] [a-z])
+        openstack server create \
+           --flavor m1.small \
+           --image debian \
+           --nic net-id=provider \
+           --security-group default \
+           --key-name mykey \
+           --user-data user-data \
+           $name
+        sleep 4; openstack server list
+        sleep 8; openstack server list
+
+  - copy:
+      dest: ./ubuntu.sh
+      mode: 0755
+      content: |
+        #!/bin/bash
+        . demo-openrc
+        name=$(shuf -n1 /usr/share/dict/words | sed "s/'s//" | tr [A-Z] [a-z])
+        openstack server create \
+           --flavor m1.small \
+           --image ubuntu \
+           --nic net-id=provider \
+           --security-group default \
+           --key-name mykey \
+           --user-data user-data \
+           $name
+        sleep 4; openstack server list
+        sleep 8; openstack server list
+
+  # ------------------ debian -----------------------
+  # echo blacklist nouveau | sudo tee -a /etc/modprobe.d/local.conf
+  # > debian has nouveau compiled in the kernel
+  # > debian then requires a reboot to blacklist nouveau
+  # sudo apt-get install -y linux-headers-$(uname -r)
+  # sudo apt-get install -y build-essential
+  # sh cuda_8.0.61_375.26_linux-run --tar xvf --no-same-owner ./InstallUtils.pm
+  # sudo PERL5LIB=. sh cuda_8.0.61_375.26_linux-run --silent --no-opengl-libs --override
+  # > note, nvcc broken, complains gcc version > 5 which it doesn't support
+  # ------------------ ubuntu -----------------------
+  # > ubuntu does not have nouveau compiled in the kernel
+  # > ubuntu does not require a reboot (so no need to blacklist nouveau)
+  # sudo apt-get install -y build-essential
+  # sudo ./cuda_8.0.61_375.26_linux-run --silent --no-opengl-libs --override
+  # -------------------------------------------------
+
+  - copy:
+      dest: ./nvidia.sh
+      mode: 0755
+      content: |
+        #!/bin/bash
+        . demo-openrc
+        name=$(shuf -n1 /usr/share/dict/words | sed "s/'s//" | tr [A-Z] [a-z])
+        openstack server create \
+           --flavor g1.medium \
+           --image ubuntu \
+           --nic net-id=provider \
+           --security-group default \
+           --key-name mykey \
+           --user-data user-data \
+           $name
+        sleep 4; openstack server list
+        sleep 8; openstack server list
+
+  # manage_etc_hosts: localhost (appends fqdn and hostname to etc/hosts)
+
+  - copy:
+      dest: ./user-data
+      content: |
+        #cloud-config
+        system_info:
+          default_user:
+            name: {{ user }}
+        packages:
+          - curl
+          - screen
+        write_files:
+          - path: /etc/modprobe.d/local_nouveau.conf
+            content: |
+              blacklist nouveau
+          - path: /etc/boto.cfg
+            content: |
+              [Credentials]
+              aws_access_key_id={{ lookup('pipe', 'aws configure get aws_access_key_id') }}
+              aws_secret_access_key={{ lookup('pipe', 'aws configure get aws_secret_access_key') }}
+          - path: /tmp/.screenrc
+            content: |
+              escape ^Oo
+              termcapinfo xterm* ti@:te@
+              bind x
+              bind ^x
+          - path: /tmp/.profile
+            content: |
+              export EDITOR=vi
+              export PAGER=less
+              export PYTHONDONTWRITEBYTECODE=on
+              [ -z "$STY" -a -n "$SSH_TTY" ] && exec screen -RR
+        runcmd:
+          - sudo -u {{ user }} tee -a /home/{{ user }}/.profile < /tmp/.profile
+          - sudo -u {{ user }} tee /home/{{ user }}/.screenrc < /tmp/.screenrc
+
+  # openstack flavor create --id 0 --vcpus 1 --ram 64 --disk 1 m1.nano
+  # port 3389 is rdp
+  # openserver server .. --availability-zone :tesla  # runs on tesla
+
+  - copy:
+      dest: ./build.sh
+      mode: 0755
+      content: |
+        #!/bin/bash
+        . admin-openrc
+        set -v
+        # provider
+        neutron net-create \
+          --shared \
+          --provider:physical_network provider \
+          --provider:network_type flat \
+          provider
+        neutron subnet-create \
+          --name provider \
+          --allocation-pool start=192.168.0.100,end=192.168.0.199 provider 192.168.0.0/24 \
+          --dns-nameserver 192.168.0.1
+        # ubuntu
+        curl -Ls -o ubuntu.img \
+          https://cloud-images.ubuntu.com/releases/16.04/release/ubuntu-16.04-server-cloudimg-amd64-disk1.img
+        openstack image create "ubuntu" \
+          --file ubuntu.img \
+          --disk-format qcow2 \
+          --container-format bare \
+          --public
+        openstack image list
+        # debian
+        curl -Ls -o debian.img \
+          http://cdimage.debian.org/cdimage/openstack/current-9/debian-9-openstack-amd64.qcow2
+        openstack image create "debian" \
+          --file debian.img \
+          --disk-format qcow2 \
+          --container-format bare \
+          --public
+        openstack image list
+        # security group and keypair
+        . demo-openrc
+        openstack security group rule create --proto icmp default
+        openstack security group rule create --proto tcp --dst-port 22 default
+        openstack security group rule create --proto tcp --dst-port 8888 default
+        openstack security group rule create --proto tcp --dst-port 3389 default # rdp
+        openstack keypair create --public-key ~/.ssh/id_rsa.pub mykey
+        openstack keypair list
+
+  # windows
+  ###############################################
+  # note, both winxp.img and win7.img will not boot with openstack
+  # winxp says you can only boot in safe mode and fails
+  # win7 says your need to repair but it unable to repair
+  # this is because they do not support virtio-blk-pci
+
+  - copy:
+      dest: ./build_win2012.sh
+      mode: 0755
+      content: |
+        #!/bin/bash
+        . admin-openrc
+        set -v
+        openstack image create "win2012" \
+          --file win2012.img \
+          --disk-format qcow2 \
+          --container-format bare \
+          --property os_type=windows \
+          --public
+        openstack image list
+
+  - copy:
+      dest: ./win2012.sh
+      mode: 0755
+      content: |
+        #!/bin/bash
+        . demo-openrc
+        name=$(shuf -n1 /usr/share/dict/words | sed "s/'s//" | tr [A-Z] [a-z])
+        openstack server create \
+           --flavor m1.medium \
+           --image win2012 \
+           --nic net-id=provider \
+           --security-group default \
+           --key-name mykey \
+           $name
+        printf "waiting for your admin password..."
+        while true; do
+           token=$(nova get-password $name ~/.ssh/id_rsa)
+           if [ $token ]; then
+               break
+           fi
+           printf '.'
+           sleep 2
+        done
+        echo
+        echo "Your admin password is $token, use it with xfreerdp:"
+        echo "$ xfreerdp /u:admin /p:$token /v:192.168.0.XXX"
+
+# ======================================================
+# shrink winxp.img virtual size down from 120G
+# ======================================================
+# 1) convert to raw
+# 2) mount using qemu-nbd
+# 3) resize using gparted (make sure ntfs-g3 is installed)
+# 4) get end sector of disk (here 9181183)
+#    $ fdisk -l /dev/ndb0
+#    > Disk myimage.img: 6144 MB, 6144000000 bytes, 12000000 sectors
+#    > Units = sectors of 1 * 512 = 512 bytes
+#    > Sector size (logical/physical): 512 bytes / 512 bytes
+#    > I/O size (minimum/optimal): 512 bytes / 512 bytes
+#    > Disk identifier: 0x000ea37d
+#    >       Device Boot      Start         End      Blocks   Id  System
+#    >       1                 2048     9181183     4589568    b  W95 FAT32
+# 5) detach and convert to raw
+# 6) truncate
+#    $ truncate --size=$[(9181183+1)*512] myimage.img
+# 7) convert to qcow2
+# 8) resize to a higher file size say 20G
+#    > note, 20G works perfectly for m1.large
+#    $ qemu-img resize root.img 20G
+# ======================================================
+
+  - copy:
+      dest: ./build_winxp.sh
+      mode: 0755
+      content: |
+        #!/bin/bash
+        . admin-openrc
+        set -v
+        openstack image create "winxp" \
+          --file winxp.img \
+          --disk-format qcow2 \
+          --container-format bare \
+          --property os_type=windows \
+          --property hw_disk_bus=ide \
+          --property hw_vif_model=rtl8139 \
+          --public
+        openstack image list
+
+  # windows xp iemodern image
+  # - make sure you disable suspend otherwise vm will stop
+  # - go to power options and set power scheme to always on
+
+  - copy:
+      dest: ./winxp.sh
+      mode: 0755
+      content: |
+        #!/bin/bash
+        . demo-openrc
+        name=$(shuf -n1 /usr/share/dict/words | sed "s/'s//" | tr [A-Z] [a-z])
+        openstack server create \
+           --flavor m1.small \
+           --image winxp \
+           --nic net-id=provider \
+           --security-group default \
+           $name
+        echo "xfreerdp /u:IEUser /p:passw0rd /v:192.168.0.XXX:3389"
+        echo "xfreerdp /u:administrator /p:Passw0rd! /v:192.168.0.XXX"
+        sleep 4; openstack server list
+        sleep 8; openstack server list
+
+

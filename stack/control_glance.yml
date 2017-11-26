@@ -1,0 +1,104 @@
+# glance
+---
+
+  - name: install glance
+    apt:
+      package: "{{ item }}"
+      state: latest
+    become: yes
+    with_items:
+    - glance
+
+  - name: configure tables
+    shell: |
+      mysql -h {{ master_ip }} -u root -p --password='{{ root_dbpass }}' -e "\
+      CREATE DATABASE glance;\
+      GRANT ALL PRIVILEGES ON glance.* TO 'glance'@'localhost'\
+        IDENTIFIED BY '{{ glance_dbpass }}';\
+      GRANT ALL PRIVILEGES ON glance.* TO 'glance'@'%'\
+        IDENTIFIED BY '{{ glance_dbpass }}';"
+
+  # create the glance user:
+
+  - name: create glance user
+    shell: |
+      source admin-openrc
+      openstack user create --domain default --password {{ glance_pass }} glance
+      openstack role add --project service --user glance admin
+
+      # create the glance service entity:
+      openstack service create --name glance --description "OpenStack Image" image
+
+      # create the Image service API endpoints:
+      openstack endpoint create --region RegionOne image public http://{{ master_ip }}:9292
+      openstack endpoint create --region RegionOne image internal http://{{ master_ip }}:9292
+      openstack endpoint create --region RegionOne image admin http://{{ master_ip }}:9292
+    args: 
+      executable: /bin/bash
+
+  # glance-api.conf
+  # Comment out or remove any other options in the [keystone_authtoken] section.
+
+  - name: glance-api.conf
+    blockinfile:
+      marker: '# control_glance_marker'
+      dest: /etc/glance/glance-api.conf
+      block: |
+        [database]
+        connection = mysql+pymysql://glance:{{ glance_dbpass }}@{{ master_ip }}/glance
+
+        [keystone_authtoken]
+        auth_uri = http://{{ master_ip }}:5000
+        auth_url = http://{{ master_ip }}:35357
+        memcached_servers = {{ master_ip }}:11211
+        auth_type = password
+        project_domain_name = default
+        user_domain_name = default
+        project_name = service
+        username = glance
+        password = {{ glance_pass }}
+
+        [paste_deploy]
+        flavor = keystone
+
+        [glance_store]
+        stores = file,http
+        default_store = file
+        filesystem_store_datadir = /var/lib/glance/images/
+    become: yes
+
+  # Comment out or remove any other options in the [keystone_authtoken] section.
+
+  - name: glance-registry.conf
+    blockinfile:
+      marker: '# control_glance_marker'
+      dest: /etc/glance/glance-registry.conf
+      block: |
+        [database]
+        connection = mysql+pymysql://glance:{{ glance_dbpass }}@{{ master_ip }}/glance
+
+        [keystone_authtoken]
+        auth_uri = http://{{ master_ip }}:5000
+        auth_url = http://{{ master_ip }}:35357
+        memcached_servers = {{ master_ip }}:11211
+        auth_type = password
+        project_domain_name = default
+        user_domain_name = default
+        project_name = service
+        username = glance
+        password = {{ glance_pass }}
+
+        [paste_deploy]
+        flavor = keystone
+    become: yes
+
+  - name: populate the image service database
+    shell: sudo -u glance glance-manage db_sync
+
+  - name: restart glance-registry
+    shell: service glance-registry restart
+    become: yes
+  - name: restart glance-api
+    shell: service glance-api restart
+    become: yes
+

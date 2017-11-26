@@ -1,0 +1,81 @@
+---
+  # install packages
+
+  - apt:
+      package: "{{ item }}"
+      state: latest
+    become: yes
+    with_items:
+    - nova-compute
+
+  # - if you want to configure additional compute nodes, prepare 
+  #   them in a similar fashion to the first compute node in the
+  #   example architectures section. Each additional compute node 
+  #   requires a unique IP address.
+  # - enable support for the Networking service:
+  #   Since Networking includes a firewall service, you must 
+  #   disable the Compute firewall service by using the 
+  #   nova.virt.firewall.NoopFirewallDriver firewall driver.
+  # - enable and configure remote console access:
+  #   1) The server component listens on all IP addresses 
+  #   2) the proxy component only listens on the management 
+  #      interface IP address of the compute node. 
+  #   3) The base URL indicates the location where you can use a 
+  #      web browser to access remote consoles of instances
+
+  # Install the packages:
+
+# - shell: sed -i s/logdir=.*/#/ /etc/nova/nova.conf
+#   become: yes
+
+  - blockinfile:
+      dest: /etc/nova/nova.conf
+      marker: '# agent_nova_marker'
+      block: |
+        [DEFAULT]
+        rpc_backend = rabbit
+
+        [oslo_messaging_rabbit]
+        rabbit_host = {{ master_ip }}
+        rabbit_userid = openstack
+        rabbit_password = {{ rabbit_pass }}
+
+        [DEFAULT]
+        auth_strategy = keystone
+
+        [keystone_authtoken]
+        auth_uri = http://{{ master_ip }}:5000
+        auth_url = http://{{ master_ip }}:35357
+        memcached_servers = {{ master_ip }}:11211
+        auth_type = password
+        project_domain_name = default
+        user_domain_name = default
+        project_name = service
+        username = nova
+        password = {{ nova_pass }}
+
+        [DEFAULT]
+        my_ip = {{ myip }}
+
+        [DEFAULT]
+        use_neutron = True
+        firewall_driver = nova.virt.firewall.NoopFirewallDriver
+
+        [glance]
+        api_servers = http://{{ master_ip }}:9292
+
+        [oslo_concurrency]
+        lock_path = /var/lib/nova/tmp
+
+        [vnc]
+        enabled = True
+        novncproxy_base_url = http://{{ master_ip }}:6080/vnc_auto.html
+        vncserver_listen = 0.0.0.0
+        vncserver_proxyclient_address = $my_ip
+    become: yes
+
+  # restart the Compute service:
+
+  - shell: service nova-compute restart
+    become: yes
+

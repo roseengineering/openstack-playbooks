@@ -1,0 +1,111 @@
+# 1) must include both the video card and the audio card onboard
+# 2) cannot abbreviate to 10de, must also give product_id
+# 3) make sure VT-d is enabled on chipset
+# 4) enable the onboard graphics chip !?
+#    (this disables the nvidia card after grub boot)
+# $ lspci -vt -- install pciutils on debian
+# $ lstopo -- install hwloc-nox
+# adding video=efifb:off to kernel options is needed by my compute box
+# ------ unbinding the root pci bridge (0000:00:03.0) ----
+# echo 1 | sudo tee /sys/bus/pci/devices/0000\:00\:03.0/remove
+# echo 1 | sudo tee /sys/bus/pci/rescan 
+---
+
+  # both video and audio ids must be added
+  # gtx  750: 10de:1380,10de:0fbc 
+  # gtx 1050: 10de:1c82,10de:0fb9
+
+  - copy:
+      dest: /etc/modprobe.d/vfio.conf
+      content: |
+        options vfio-pci ids=10de:1380,10de:0fbc,10de:1c82,10de:0fb9
+    become: yes
+
+  - copy:
+      dest: /etc/modules-load.d/modules.conf
+      content: |
+        vfio-pci
+    become: yes
+
+  - shell: update-initramfs -u
+    become: yes
+
+  # setup nova for passthru 
+  # whitelist the gpu only - so include product_id
+
+  - blockinfile:
+      dest: /etc/nova/nova.conf
+      marker: '# agent_passthru_marker'
+      block: |
+        [DEFAULT]
+        pci_passthrough_whitelist = {"vendor_id":"10de","product_id":"1380"}
+        pci_passthrough_whitelist = {"vendor_id":"10de","product_id":"1c82"}
+    become: yes
+
+  # fake out nvidia
+
+  - shell: mv /usr/bin/qemu-system-x86_64 /usr/bin/qemu-system-x86_64.orig
+    become: yes
+
+  - copy:
+      dest: /usr/bin/qemu-system-x86_64
+      mode: 0755
+      content: |
+        #!/usr/bin/python
+        import os
+        import sys
+        import json
+        new_args = []
+        print >> sys.stderr, 'old_args', json.dumps(sys.argv, indent=2)
+        for i in range(len(sys.argv)):
+            if i<=1: 
+                new_args.append(sys.argv[i])
+                continue
+            if sys.argv[i-1] != "-cpu":
+                new_args.append(sys.argv[i])
+                continue
+            subargs = sys.argv[i].split(",")
+            subargs.insert(1,"kvm=off")
+            subargs.insert(2,"hv_vendor_id=MyFake_KVM")
+            new_arg = ",".join(subargs)
+            new_args.append(new_arg)
+        print >> sys.stderr, 'new_args', json.dumps(new_args, indent=2)
+        os.execv('/usr/bin/qemu-system-x86_64.orig', new_args)
+    become: yes
+
+  # update apparmor
+
+  - lineinfile:
+      dest: /etc/apparmor.d/abstractions/libvirt-qemu
+      line: "{{ item }}"
+      insertbefore: /usr/bin/qemu-system-x86_64 rmix,
+    with_items: 
+    - /usr/bin/qemu-system-x86_64.orig rmix,
+    become: yes
+
+  - shell: systemctl reload apparmor
+    become: yes
+    ignore_errors: true
+
+  # turning aspm off allows gpus to idle in P8 state!
+
+  - name: grub
+    shell: |
+      sed -i 's/LINUX_DEFAULT=.*/LINUX_DEFAULT="intel_iommu=on pcie_aspm=off video=efifb:off"/' /etc/default/grub
+      update-grub
+    become: yes
+
+  # tools
+
+  - copy:
+      dest: ./iommu.sh
+      mode: 0755
+      content: |
+        #!/bin/bash
+        shopt -s nullglob
+        for d in /sys/kernel/iommu_groups/*/devices/*; do 
+            n=${d#*/iommu_groups/*}; n=${n%%/*}
+            printf 'IOMMU Group %s ' "$n"
+            lspci -nns "${d##*/}"
+        done;
+

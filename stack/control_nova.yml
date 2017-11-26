@@ -1,0 +1,131 @@
+# nova
+---
+  # install packages
+
+  - apt:
+      package: "{{ item }}"
+      state: latest
+    become: yes
+    with_items:
+    - nova-api 
+    - nova-conductor
+    - nova-consoleauth
+    - nova-novncproxy
+    - nova-scheduler
+
+  # create the nova_api and nova databases:
+  # grant proper access to the databases:
+
+  - shell: |
+      mysql -h {{ master_ip }} -u root -p --password='{{ root_dbpass }}' -e "\
+      CREATE DATABASE nova_api;\
+      CREATE DATABASE nova;\
+      GRANT ALL PRIVILEGES ON nova_api.* TO 'nova'@'localhost'\
+        IDENTIFIED BY '{{ nova_dbpass }}';\
+      GRANT ALL PRIVILEGES ON nova_api.* TO 'nova'@'%'\
+        IDENTIFIED BY '{{ nova_dbpass }}';\
+      GRANT ALL PRIVILEGES ON nova.* TO 'nova'@'localhost'\
+        IDENTIFIED BY '{{ nova_dbpass }}';\
+      GRANT ALL PRIVILEGES ON nova.* TO 'nova'@'%'\
+        IDENTIFIED BY '{{ nova_dbpass }}';"
+
+  # create the nova user:
+  # add the admin role to the nova user:
+
+  - shell: |
+      source admin-openrc
+      openstack user create --domain default --password {{ nova_pass }} nova
+      openstack role add --project service --user nova admin
+
+      # create the nova service entity:
+      openstack service create --name nova --description "OpenStack Compute" compute
+
+      # create endpoints
+      openstack endpoint create --region RegionOne compute public http://{{ master_ip }}:8774/v2.1/%\(tenant_id\)s
+      openstack endpoint create --region RegionOne compute internal http://{{ master_ip }}:8774/v2.1/%\(tenant_id\)s
+      openstack endpoint create --region RegionOne compute admin http://{{ master_ip }}:8774/v2.1/%\(tenant_id\)s
+    args: 
+      executable: /bin/bash
+
+  # - enable only the compute and metadata APIs:
+
+  - shell: sed -i s/logdir=.*// /etc/nova/nova.conf
+    become: yes
+  - shell: sed -i s/enabled_apis=.*// /etc/nova/nova.conf
+    become: yes
+
+  - blockinfile:
+      dest: /etc/nova/nova.conf
+      marker: '# control_nova_marker'
+      block: |
+        [DEFAULT]
+        enabled_apis = osapi_compute,metadata
+
+        [api_database]
+        connection = mysql+pymysql://nova:{{ nova_dbpass }}@{{ master_ip }}/nova_api
+
+        [database]
+        connection = mysql+pymysql://nova:{{ nova_dbpass }}@{{ master_ip }}/nova
+
+        [DEFAULT]
+        rpc_backend = rabbit
+
+        [oslo_messaging_rabbit]
+        rabbit_host = {{ master_ip }}
+        rabbit_userid = openstack
+        rabbit_password = {{ rabbit_pass }}
+
+        [DEFAULT]
+        auth_strategy = keystone
+
+        [keystone_authtoken]
+        auth_uri = http://{{ master_ip }}:5000
+        auth_url = http://{{ master_ip }}:35357
+        memcached_servers = {{ master_ip }}:11211
+        auth_type = password
+        project_domain_name = default
+        user_domain_name = default
+        project_name = service
+        username = nova
+        password = {{ nova_pass }}
+
+        [DEFAULT]
+        my_ip = {{ myip }}
+
+        [DEFAULT]
+        use_neutron = True
+        firewall_driver = nova.virt.firewall.NoopFirewallDriver
+
+        [vnc]
+        vncserver_listen = $my_ip
+        vncserver_proxyclient_address = $my_ip
+
+        [glance]
+        api_servers = http://{{ master_ip }}:9292
+
+        [oslo_concurrency]
+        lock_path = /var/lib/nova/tmp
+
+        [DEFAULT]
+        scheduler_default_filters=AllHostsFilter
+    become: yes
+
+  # populate the Compute databases:
+
+  - shell: sudo -u nova nova-manage api_db sync
+
+  - shell: sudo -u nova nova-manage db sync
+
+# restart the compute services:
+
+  - shell: service nova-api restart
+    become: yes
+  - shell: service nova-consoleauth restart
+    become: yes
+  - shell: service nova-scheduler restart
+    become: yes
+  - shell: service nova-conductor restart
+    become: yes
+  - shell: service nova-novncproxy restart
+    become: yes
+

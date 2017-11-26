@@ -1,0 +1,30 @@
+# nova-local
+---
+  # install packages
+
+  - apt:
+      package: "{{ item }}"
+      state: latest
+    become: yes
+    with_items:
+    - nova-compute
+
+  # nova compute node
+
+  - shell: sed -i s/logdir=.*// /etc/nova/nova.conf
+    become: yes
+
+  - blockinfile:
+      dest: /etc/nova/nova.conf
+      marker: '# local_nova_marker'
+      block: |
+        [vnc]
+        enabled = True
+        novncproxy_base_url = http://{{ master_ip }}:6080/vnc_auto.html
+    become: yes
+
+  # restart the Compute service:
+
+  - shell: service nova-compute restart
+    become: yes
+

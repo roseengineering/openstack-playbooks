@@ -1,0 +1,236 @@
+---
+  # disto
+
+  - shell: lsb_release -si
+    register: distro
+
+  # grub (when grub defined)
+
+  - shell: |
+      sed -i 's/^GRUB_TIMEOUT=.*/GRUB_TIMEOUT=4/' /etc/default/grub
+      sed -i 's/^GRUB_HIDDEN_TIMEOUT=/#GRUB_HIDDEN_TIMEOUT=/' /etc/default/grub
+      sed -i 's/^GRUB_CMDLINE_LINUX_DEFAULT=.*/GRUB_CMDLINE_LINUX_DEFAULT="{{ grub }}"/' /etc/default/grub
+      update-grub
+    become: yes
+    when: grub is defined
+
+  # sudo
+
+  - copy:
+      dest: /etc/sudoers.d/{{ user }}
+      content: |
+        {{ user }} ALL=(ALL) NOPASSWD:ALL
+    become: yes
+
+  # sshd_config
+
+  - replace:
+      path: /etc/ssh/sshd_config
+      regexp: '^(PasswordAuthentication yes)'
+      replace: '# \1'
+    become: yes
+
+  - lineinfile:
+      path: /etc/ssh/sshd_config
+      line: PasswordAuthentication no
+    become: yes
+
+  # /etc/default/locale
+
+  - replace: # set to none since it overrides ssh
+      path: /etc/default/locale
+      regexp: '^(LANG=.*)'
+      replace: '# \1'
+    become: yes
+
+  # /etc/locale.gen
+
+  - copy:
+      dest: /etc/locale.gen
+      backup: yes
+      content: |
+        en_US.UTF-8 UTF-8
+    become: yes
+
+  # NOT IDEMPOTENT
+  - shell: locale-gen
+    become: yes
+
+  # /etc/default/keyboard
+
+  - copy:
+      dest: /etc/default/keyboard
+      backup: yes
+      content: |
+        XKBMODEL="pc104"
+        XKBLAYOUT="us"
+        XKBVARIANT=""
+        XKBOPTIONS=""
+        BACKSPACE="guess"
+    become: yes
+
+  # /etc/localtime
+
+  - shell: |
+      rm /etc/localtime
+      ln -s /usr/share/zoneinfo/America/New_York /etc/localtime
+    become: yes
+
+  # /etc/hostname
+
+  - copy: 
+      dest: /etc/hostname
+      content: |
+        {{ hostname }}
+    become: yes
+    when: hostname is defined
+
+  - replace:
+      path: /etc/hosts
+      regexp: '^(127\.0\.1\.1\s+.*)'
+      replace: '# \1'
+    become: yes
+    when: hostname is defined
+
+  - lineinfile:
+      path: /etc/hosts
+      line: 127.0.0.1 {{ hostname }}
+    become: yes
+    when: hostname is defined
+
+  # pip.conf
+
+  - copy:
+      dest: /etc/pip.conf
+      content: |
+        [global]
+        format = columns
+    become: yes
+
+  # software
+  ###########################
+
+  # packages
+
+  - apt:
+      update_cache: yes
+      package: "{{ item }}"
+      state: latest
+    become: yes
+    with_items:
+    - screen
+    - curl
+    - unzip
+    - zip
+    - git
+    - vim
+    - w3m
+    - jq
+    - resolvconf
+
+  # install pip
+
+  - shell: |
+      curl -s https://bootstrap.pypa.io/get-pip.py | python3
+      rm /usr/local/bin/pip
+    args:
+      creates: /usr/local/bin/pip3
+    become: yes
+
+  # python
+
+  - shell: |
+      pip3 install awscli
+      pip3 install boto3
+    args:
+      creates: /usr/local/bin/aws
+    become: yes
+
+  # local
+  ############################
+
+  # ssh
+
+  - file: 
+      path: .ssh 
+      state: directory
+
+  - copy: 
+      dest: .ssh/authorized_keys 
+      content: |
+        {{ id_rsa_pub }}
+
+  - copy: 
+      dest: .ssh/id_rsa
+      content: |
+        {{ id_rsa }}
+      mode: 0600
+    when: no_private_key is not defined
+
+  - copy: 
+      dest: .ssh/id_rsa.pub
+      content: |
+        {{ id_rsa_pub }}
+
+  # .ssh/config
+
+  - copy:
+      dest: .ssh/config
+      content: |
+        StrictHostKeyChecking no
+
+  # .profile
+
+  - lineinfile:
+      dest: ./.profile
+      line: "{{ item }}"
+    with_items: 
+      - export EDITOR=vi
+      - export PAGER=less
+      - export PYTHONDONTWRITEBYTECODE=on
+      - '[ -z "$STY" -a -n "$SSH_TTY" ] && exec screen -RR'
+      - export LANG=en_US.UTF-8
+
+  # .bash_aliases
+
+  - copy:
+      dest: ./.bash_aliases
+      content: |
+        stty -ixon
+        alias vi='vi -p'
+        alias list_instances='list_instances -H ID,Zone,State,Type,IP,PrivateIP'
+        complete -C aws_completer aws
+
+  # screenrc
+
+  - copy: # unbind lock screen
+      dest: ./.screenrc
+      content: |
+        escape ^Oo
+        termcapinfo xterm* ti@:te@
+        bind x
+        bind ^x
+
+  # .gitconfig
+
+  - name: .gitconfig
+    shell: |
+      git config --global user.name {{ user }}
+      git config --global user.email {{ user }}
+      git config --global alias.co checkout
+      git config --global alias.ci "commit -a"
+    args:
+      creates: ./.gitconfig
+
+  # .vimrc
+
+  - copy:
+      dest: ./.vimrc
+      content: |
+        syntax on
+        set shiftwidth=4
+        set mouse=a
+        set tabpagemax=99
+        set noswapfile
+
+

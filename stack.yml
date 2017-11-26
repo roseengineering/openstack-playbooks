@@ -1,0 +1,87 @@
+---
+
+- hosts: localhost
+  gather_facts: no
+  vars:
+    ansible_connection: ssh
+    ansible_host: "{{ hosts }}"
+    ansible_ssh_port: "{{ sshport | default('22') }}"
+    ansible_ssh_pass: passw0rd
+    ansible_sudo_pass: passw0rd
+  tasks: 
+  - include_vars: config.yml
+
+  - shell: lsb_release -a
+
+  - replace:
+      path: /etc/network/interfaces
+      regexp: '^(.*dhcp.*)'
+      replace: '# \1'
+    become: yes
+    when: myif is defined
+
+  - replace:
+      path: /etc/network/interfaces
+      regexp: '^(auto {{ myif }}.*)'
+      replace: '# \1'
+    become: yes
+    when: myif is defined
+
+  - replace:
+      path: /etc/network/interfaces
+      regexp: '^(allow-hotplug {{ myif }}.*)'
+      replace: '# \1'
+    become: yes
+    when: myif is defined
+
+  # use myif and myip instead of internal_if
+
+  - copy:
+      dest: /etc/network/interfaces.d/{{ myif }}
+      content: |
+        auto {{ myif }}
+        iface {{ myif }} inet static
+        address {{ myip }}/24
+        gateway {{ gateway | default('192.168.0.1') }}
+        dns-nameserver {{ nameserver | default('192.168.0.1') }}
+    become: yes
+    when: myif is defined
+
+  - copy:
+      dest: /etc/network/interfaces.d/{{ provider_if }}
+      content: |
+        auto {{ provider_if }}
+        iface {{ provider_if }} inet manual
+        up ifconfig {{ provider_if }} up
+    become: yes
+    when: provider_if is defined
+
+  # setup
+
+  - include: boot.yml
+
+  # python2 required otherwise computer will not reboot
+
+  - apt:
+      package: python
+      state: latest
+    become: yes
+
+  # reboot to configure network interfaces
+
+  - shell: sleep 2 && reboot
+    become: yes
+    async: 1
+    poll: 0
+    ignore_errors: yes
+
+- hosts: localhost
+  gather_facts: no
+  tasks: 
+  - local_action: wait_for 
+      host={{ myip | default('') }} 
+      port={{ sshport | default(22) }}
+      delay=10 
+      timeout=600 
+      state=started
+

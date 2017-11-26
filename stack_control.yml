@@ -1,0 +1,26 @@
+---
+
+- hosts: localhost
+  gather_facts: no
+  vars:
+    ansible_connection: ssh
+    ansible_host: "{{ hosts }}"
+    ansible_ssh_port: "{{ sshport | default('22') }}"
+  tasks: 
+  - include_vars: stack/config.yml
+  - shell: lsb_release -a
+
+  # controller
+
+  - set_fact:
+      master_ip: "{{ myip }}"
+
+  - include: stack/control_openrc.yml
+  - include: stack/control_base.yml
+  - include: stack/control_keystone.yml
+  - include: stack/control_glance.yml
+  - include: stack/control_horizon.yml
+  - include: stack/control_nova.yml
+  - include: stack/control_neutron.yml
+  - include: stack/control_passthru.yml
+

@@ -1,0 +1,25 @@
+---
+
+- hosts: localhost
+  gather_facts: no
+  vars:
+    ansible_connection: ssh
+    ansible_host: "{{ hosts }}"
+    ansible_ssh_port: "{{ sshport | default('22') }}"
+  tasks: 
+  - include_vars: stack/config.yml
+  - shell: lsb_release -a
+
+  # local agents
+
+  - set_fact:
+      master_ip: "{{ myip }}"
+
+  - include: stack/local_nova.yml
+  - include: stack/agent_passthru.yml
+
+  # nova needs a reboot
+
+  - shell: reboot
+    become: yes
+

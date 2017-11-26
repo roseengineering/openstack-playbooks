@@ -1,0 +1,30 @@
+# disable auto-updates
+# - shell: sed -i s/"1"/"0"/ /etc/apt/apt.conf.d/20auto-upgrades 
+#   become: yes
+---
+  # install packages
+
+  - apt:
+      update_cache: yes
+      package: "{{ item }}"
+      state: latest
+    become: yes
+    with_items:
+    - python-openstackclient
+    - mariadb-client
+    - chrony
+
+  # chrony (server)
+
+  - shell: sed -i s/^pool.*// /etc/chrony/chrony.conf
+    become: yes
+  - blockinfile:
+      marker: '# agent_base_marker'
+      dest: /etc/chrony/chrony.conf
+      block: |
+        server {{ master_ip }} iburst
+    become: yes
+  - shell: service chrony restart
+    become: yes
+
+
